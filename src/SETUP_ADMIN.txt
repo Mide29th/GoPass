@@ -1,0 +1,50 @@
+============================================
+   GOPASS ADMIN SETUP - COPY & PASTE THIS!
+============================================
+
+STEP 1: Open your GoPass app in browser
+STEP 2: Press F12 to open Developer Console
+STEP 3: Click "Console" tab
+STEP 4: Copy and paste the code below:
+
+--------------------------------------------
+
+// Change these to your desired login credentials
+const adminEmail = "admin@gopass.com";
+const adminPassword = "SecurePassword123!";
+
+// Run this (don't change anything below)
+fetch(window.location.origin + '/functions/v1/make-server-0f8d8d4a/setup-admin', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + 'YOUR_SUPABASE_ANON_KEY'
+  },
+  body: JSON.stringify({ email: adminEmail, password: adminPassword })
+})
+.then(res => res.json())
+.then(data => {
+  if (data.message) {
+    console.log('✅ SUCCESS!', data.message);
+    console.log('📧 Email:', data.email);
+    alert('Admin account created! Click "Admin Access" at bottom of page to login.');
+  } else {
+    console.error('❌ Error:', data.error);
+    alert('Error: ' + data.error);
+  }
+})
+.catch(err => {
+  console.error('❌ Failed:', err);
+  alert('Failed to create admin: ' + err.message);
+});
+
+--------------------------------------------
+
+STEP 5: Press Enter
+STEP 6: You'll see "Admin account created!"
+STEP 7: Click "Admin Access" button at bottom of homepage
+STEP 8: Login with your email and password
+
+✅ DONE! You now have full admin access!
+
+============================================

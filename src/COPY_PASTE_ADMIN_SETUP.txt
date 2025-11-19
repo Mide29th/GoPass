@@ -1,0 +1,63 @@
+================================================================================
+               GOPASS ADMIN SETUP - COPY & PASTE THESE VALUES
+================================================================================
+
+📍 WHERE TO GO:
+   Supabase Dashboard → Table Editor → kv_store_0f8d8d4a → Insert → Insert row
+
+================================================================================
+
+📝 FIELD 1 - key:
+   Copy this exactly ↓
+
+   admin:credentials
+
+================================================================================
+
+📝 FIELD 2 - value:
+   Copy this and CHANGE THE PASSWORD ↓
+
+   {"id":"admin-1","email":"admin@gopass.com","password":"YourSecurePassword123!"}
+
+   ⚠️  CHANGE "YourSecurePassword123!" TO YOUR OWN PASSWORD
+   ⚠️  KEEP the quotes and curly braces exactly as shown
+
+================================================================================
+
+💡 EXAMPLE WITH YOUR OWN PASSWORD:
+
+   If you want password "MyPass2024!", enter this in the value field:
+
+   {"id":"admin-1","email":"admin@gopass.com","password":"MyPass2024!"}
+
+================================================================================
+
+✅ AFTER SAVING:
+
+   1. Go to GoPass homepage
+   2. Click "Admin Access" (bottom of page)
+   3. Login with:
+      Email: admin@gopass.com
+      Password: (whatever you set above)
+
+================================================================================
+
+🎯 QUICK CHECKLIST:
+
+   [ ] Opened Supabase dashboard
+   [ ] Clicked "Table Editor" in sidebar
+   [ ] Found table "kv_store_0f8d8d4a"
+   [ ] Clicked "Insert" → "Insert row"
+   [ ] Copied "admin:credentials" into key field
+   [ ] Copied the JSON into value field (with YOUR password)
+   [ ] Clicked "Save"
+   [ ] Saw success message
+   [ ] Went to GoPass → Admin Access
+   [ ] Logged in successfully!
+
+================================================================================
+
+🔧 NEED HELP?
+   Check /ADMIN_SETUP_SUPABASE_STEPS.md for detailed instructions with visuals
+
+================================================================================
