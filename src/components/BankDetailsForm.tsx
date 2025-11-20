@@ -143,39 +143,17 @@ export function BankDetailsForm({ userId, userEmail, userName, onComplete, onBac
     setAccountName('');
     setVerificationError('');
     
-    // Auto-verify when 10+ digits entered and bank is selected
-    if (value.length >= 10 && bankCode) {
-      verifyAccount();
+    // Auto-verify when 10 digits entered and bank is selected
+    if (value.length === 10 && bankCode) {
+      verifyAccount(value, bankCode);
     }
   };
 
-  const verifyAccount = async () => {
-    if (!accountNumber || accountNumber.length < 10) {
-      toast.error('Please enter a valid account number (10+ digits)');
-      return;
-    }
-
-    if (!bankCode) {
-      toast.error('Please select a bank');
-      return;
-    }
-
+  const verifyAccount = async (accNum: string, bCode: string) => {
     setVerifying(true);
-
+    setVerificationError('');
+    
     try {
-      // Check if this is a test account (10 zeros) - bypass Paystack for testing
-      const isTestAccount = accountNumber === '0000000000';
-      if (isTestAccount) {
-        // Test mode: bypass Paystack and use mock account name
-        console.log('ℹ️ Test account detected (0000000000). Using mock account verification.');
-        setAccountName(`TEST ACCOUNT - ${bankName}`);
-        setIsVerified(true);
-        toast.success(`Account verified (TEST MODE): TEST ACCOUNT - ${bankName}`);
-        setVerifying(false);
-        return;
-      }
-
-      // Proceed with Paystack verification for live banks
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-0f8d8d4a/verify-account`,
         {
@@ -185,26 +163,30 @@ export function BankDetailsForm({ userId, userEmail, userName, onComplete, onBac
             'Authorization': `Bearer ${publicAnonKey}`,
           },
           body: JSON.stringify({
-            account_number: accountNumber,
-            bank_code: bankCode,
+            account_number: accNum,
+            bank_code: bCode,
           }),
         }
       );
 
-      const data = await response.json();
+      const result = await response.json();
 
-      if (data.status === 'success' && data.account_name) {
-        // Bank verification succeeded
-        setAccountName(data.account_name);
+      if (response.ok && result.verified) {
         setIsVerified(true);
-        toast.success(`Account verified: ${data.account_name}`);
+        setAccountName(result.account_name);
+        toast.success(`Account verified: ${result.account_name}`);
       } else {
-        toast.error(data.error || 'Failed to verify account');
-        setVerificationError(data.error || 'Verification failed');
+        setIsVerified(false);
+        setAccountName('');
+        setVerificationError(result.error || 'Could not verify account');
+        toast.error(result.error || 'Invalid account number');
       }
     } catch (error) {
-      console.error('Account verification failed:', error);
-      toast.error('Failed to verify account. Please try again.');
+      console.error('Verification error:', error);
+      setIsVerified(false);
+      setAccountName('');
+      setVerificationError('Failed to verify account. Please try again.');
+      toast.error('Failed to verify account');
     } finally {
       setVerifying(false);
     }
@@ -235,85 +217,76 @@ export function BankDetailsForm({ userId, userEmail, userName, onComplete, onBac
 
       let subaccountCode = null;
 
-      // Skip webhook for test account 0000000000 (not a real account)
-      const isTestAccount = accountNumber === '0000000000';
-      
-      if (isTestAccount) {
-        console.log('⚠️ Test account (0000000000) detected - skipping Make.com webhook');
-        console.log('ℹ️ Test accounts do not need Paystack subaccounts');
-        toast.info('Test account - no subaccount creation needed.');
-      } else {
-        // Try to send to Make.com webhook for real banks
-        try {
-          const webhookPayload = {
-            organizer_id: authenticatedUserId,
-            bank_code: bankCode,
-            account_number: accountNumber,
-            account_name: accountName,
-            email: userEmail,
-            business_name: userName,
-          };
+      // Try to send to Make.com webhook
+      try {
+        const webhookPayload = {
+          organizer_id: authenticatedUserId,
+          bank_code: bankCode,
+          account_number: accountNumber,
+          account_name: accountName,
+          email: userEmail,
+          business_name: userName,
+        };
 
-          console.log('=== SENDING TO MAKE.COM WEBHOOK ===');
-          console.log('Webhook URL:', WEBHOOK_ORGANIZER_ONBOARDING);
-          console.log('Payload:', JSON.stringify(webhookPayload, null, 2));
+        console.log('=== SENDING TO MAKE.COM WEBHOOK ===');
+        console.log('Webhook URL:', WEBHOOK_ORGANIZER_ONBOARDING);
+        console.log('Payload:', JSON.stringify(webhookPayload, null, 2));
 
-          const response = await fetch(WEBHOOK_ORGANIZER_ONBOARDING, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(webhookPayload),
-          });
+        const response = await fetch(WEBHOOK_ORGANIZER_ONBOARDING, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookPayload),
+        });
 
-          console.log('=== MAKE.COM RESPONSE ===');
-          console.log('Status:', response.status);
-          console.log('Status Text:', response.statusText);
-          console.log('Headers:', Object.fromEntries(response.headers.entries()));
-          
-          const responseText = await response.text();
-          console.log('Response Body:', responseText);
+        console.log('=== MAKE.COM RESPONSE ===');
+        console.log('Status:', response.status);
+        console.log('Status Text:', response.statusText);
+        console.log('Headers:', Object.fromEntries(response.headers.entries()));
+        
+        const responseText = await response.text();
+        console.log('Response Body:', responseText);
 
-          if (response.ok) {
-            try {
-              const result = JSON.parse(responseText);
-              console.log('✅ Parsed webhook response:', result);
-              subaccountCode = result.subaccount_code || result.subaccount_id || null;
-              
-              if (subaccountCode) {
-                console.log('✅ Received subaccount code:', subaccountCode);
-                toast.success('Paystack subaccount created successfully!');
-              } else {
-                console.warn('⚠️ Webhook succeeded but no subaccount_code in response');
-                toast.warning('Webhook received but subaccount code not returned. Check Make.com logs.');
-              }
-            } catch (parseError) {
-              console.error('❌ Failed to parse webhook response as JSON:', parseError);
-              console.log('Raw response:', responseText);
-              
-              // Check if response contains "Accepted" or success indicators
-              if (responseText.includes('Accepted') || responseText.includes('success') || responseText.includes('200')) {
-                console.log('✅ Webhook appears to have succeeded (non-JSON response)');
-                toast.info('Webhook triggered successfully. Subaccount will be created in Make.com.');
-              } else {
-                toast.warning('Webhook responded but format unclear. Check Make.com for subaccount creation.');
-              }
+        if (response.ok) {
+          try {
+            const result = JSON.parse(responseText);
+            console.log('✅ Parsed webhook response:', result);
+            subaccountCode = result.subaccount_code || result.subaccount_id || null;
+            
+            if (subaccountCode) {
+              console.log('✅ Received subaccount code:', subaccountCode);
+              toast.success('Paystack subaccount created successfully!');
+            } else {
+              console.warn('⚠️ Webhook succeeded but no subaccount_code in response');
+              toast.warning('Webhook received but subaccount code not returned. Check Make.com logs.');
             }
-          } else {
-            console.error('❌ Make.com webhook returned error');
-            console.error('Status:', response.status);
-            console.error('Body:', responseText);
-            toast.error(`Webhook error: ${response.status} - ${responseText.substring(0, 100)}`);
+          } catch (parseError) {
+            console.error('❌ Failed to parse webhook response as JSON:', parseError);
+            console.log('Raw response:', responseText);
+            
+            // Check if response contains "Accepted" or success indicators
+            if (responseText.includes('Accepted') || responseText.includes('success') || responseText.includes('200')) {
+              console.log('✅ Webhook appears to have succeeded (non-JSON response)');
+              toast.info('Webhook triggered successfully. Subaccount will be created in Make.com.');
+            } else {
+              toast.warning('Webhook responded but format unclear. Check Make.com for subaccount creation.');
+            }
           }
-        } catch (webhookError) {
-          console.error('❌ ERROR CALLING MAKE.COM WEBHOOK:', webhookError);
-          console.error('Error details:', {
-            message: webhookError.message,
-            stack: webhookError.stack,
-            name: webhookError.name
-          });
-          toast.error(`Webhook connection failed: ${webhookError.message}`);
+        } else {
+          console.error('❌ Make.com webhook returned error');
+          console.error('Status:', response.status);
+          console.error('Body:', responseText);
+          toast.error(`Webhook error: ${response.status} - ${responseText.substring(0, 100)}`);
         }
+      } catch (webhookError) {
+        console.error('❌ ERROR CALLING MAKE.COM WEBHOOK:', webhookError);
+        console.error('Error details:', {
+          message: webhookError.message,
+          stack: webhookError.stack,
+          name: webhookError.name
+        });
+        toast.error(`Webhook connection failed: ${webhookError.message}`);
       }
 
       // Update organizer record with bank details and subaccount_id
@@ -467,15 +440,6 @@ export function BankDetailsForm({ userId, userEmail, userName, onComplete, onBac
           </AlertDescription>
         </Alert>
 
-        {bankCode === '001' && (
-          <Alert className="mb-6 bg-yellow-50 border-yellow-200">
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
-            <AlertDescription className="text-yellow-800">
-              <strong>Test Mode:</strong> You are using a test bank code (001). Account verification uses mock data for testing purposes.
-            </AlertDescription>
-          </Alert>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="bank">Bank Name</Label>
@@ -506,8 +470,8 @@ export function BankDetailsForm({ userId, userEmail, userName, onComplete, onBac
                 id="accountNumber"
                 value={accountNumber}
                 onChange={(e) => handleAccountNumberChange(e.target.value)}
-                placeholder="e.g., 0123456789"
-                maxLength={20}
+                placeholder="0123456789"
+                maxLength={10}
                 disabled={!bankCode}
                 required
                 className={
@@ -560,7 +524,7 @@ export function BankDetailsForm({ userId, userEmail, userName, onComplete, onBac
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Enter your account number (10+ digits) to auto-verify
+                Enter your 10-digit account number to auto-verify
               </p>
             )}
           </div>
