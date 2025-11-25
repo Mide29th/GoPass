@@ -3,13 +3,6 @@
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
   "framework": "vite",
-  "env": {
-    "VITE_SUPABASE_URL": "@vite_supabase_url",
-    "VITE_SUPABASE_ANON_KEY": "@vite_supabase_anon_key",
-    "VITE_WEBHOOK_ORGANIZER_ONBOARDING": "@vite_webhook_organizer_onboarding",
-    "VITE_WEBHOOK_EVENT_CREATION": "@vite_webhook_event_creation",
-    "VITE_APP_URL": "@vite_app_url"
-  },
   "rewrites": [
     {
       "source": "/(.*)",
