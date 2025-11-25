@@ -143,8 +143,8 @@ export function BankDetailsForm({ userId, userEmail, userName, onComplete, onBac
     setAccountName('');
     setVerificationError('');
     
-    // Auto-verify when 10 digits entered and bank is selected
-    if (value.length === 10 && bankCode) {
+    // Auto-verify when 10+ digits entered and bank is selected
+    if (value.length >= 10 && bankCode) {
       verifyAccount(value, bankCode);
     }
   };

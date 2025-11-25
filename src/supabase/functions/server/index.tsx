@@ -183,9 +183,9 @@ app.post("/make-server-0f8d8d4a/verify-account", async (c) => {
       return c.json({ error: 'Account number and bank code are required' }, 400);
     }
 
-    // Validate account number format (should be 10 digits for Nigerian banks)
-    if (!/^\d{10}$/.test(account_number)) {
-      return c.json({ error: 'Account number must be exactly 10 digits' }, 400);
+    // Validate account number format (should be 10+ digits for Nigerian banks)
+    if (!/^\d{10,}$/.test(account_number)) {
+      return c.json({ error: 'Account number must be at least 10 digits' }, 400);
     }
     
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
