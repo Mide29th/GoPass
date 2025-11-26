@@ -7,6 +7,10 @@ export const WEBHOOK_ORGANIZER_ONBOARDING = 'https://hook.us2.make.com/cl2nnrnpe
 // Workflow B: Event Creation - Creates Paystack payment page when organizer creates an event
 export const WEBHOOK_EVENT_CREATION = 'https://hook.us2.make.com/t4h4kg28d99nzyq9vgebcsdxd31pst9q';
 
-// Workflow C: This is configured in Paystack Dashboard, not here
+// Workflow C: Ticket Purchase - Sends QR code via email & WhatsApp when ticket is purchased
+// Generate a new Make.com webhook URL and add it here
+export const WEBHOOK_TICKET_PURCHASE = 'https://hook.us2.make.com/YOUR_TICKET_WEBHOOK_URL';
+
+// Workflow D: This is configured in Paystack Dashboard, not here
 // Go to Paystack Dashboard → Settings → Webhooks
 // Add your Make.com webhook URL there to listen for charge.success events
