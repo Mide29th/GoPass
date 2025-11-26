@@ -188,6 +188,19 @@ app.post("/make-server-0f8d8d4a/verify-account", async (c) => {
       return c.json({ error: 'Account number must be at least 10 digits' }, 400);
     }
     
+    // Check if this is a test account (10 zeros) - bypass Paystack for testing
+    const isTestAccount = account_number === '0000000000';
+    if (isTestAccount) {
+      console.log('ℹ️ Test account detected (0000000000). Returning mock account verification.');
+      return c.json({
+        status: 'success',
+        verified: true,
+        account_name: `TEST ACCOUNT - ${bank_code}`,
+        account_number: account_number,
+        message: 'Account verified (TEST MODE)'
+      });
+    }
+    
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
     if (!paystackSecretKey) {
       console.error('PAYSTACK_SECRET_KEY not configured');
@@ -214,13 +227,25 @@ app.post("/make-server-0f8d8d4a/verify-account", async (c) => {
     if (!response.ok || !result.status) {
       console.error('Account verification failed:', result);
       return c.json({ 
+        status: 'error',
         error: result.message || 'Could not verify account number. Please check and try again.',
+        verified: false 
+      }, 400);
+    }
+
+    // Validate account name exists
+    if (!result.data || !result.data.account_name) {
+      console.error('Account name missing in Paystack response');
+      return c.json({ 
+        status: 'error',
+        error: 'Account verified but name not found. Please try again.',
         verified: false 
       }, 400);
     }
 
     // Return the verified account name
     return c.json({ 
+      status: 'success',
       verified: true,
       account_name: result.data.account_name,
       account_number: result.data.account_number,
@@ -229,6 +254,7 @@ app.post("/make-server-0f8d8d4a/verify-account", async (c) => {
   } catch (error) {
     console.error('Account verification exception:', error);
     return c.json({ 
+      status: 'error',
       error: 'Failed to verify account. Please try again.',
       verified: false 
     }, 500);
