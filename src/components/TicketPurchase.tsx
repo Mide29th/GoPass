@@ -5,6 +5,7 @@ import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { getEventWithTickets, createOrder, Event, TicketType } from '../lib/supabase';
+import { processTicketPurchaseNotification } from '../lib/ticketNotifications';
 import { toast } from 'sonner@2.0.3';
 import { Calendar, MapPin, Ticket, CreditCard } from 'lucide-react';
 import { Badge } from './ui/badge';
@@ -92,12 +93,28 @@ export function TicketPurchase({ eventId, onPurchaseComplete }: TicketPurchasePr
         checked_in: false,
       });
 
-      // Simulate sending email and WhatsApp
-      console.log('📧 Email sent to:', attendeeEmail);
-      console.log('📱 WhatsApp sent to:', attendeePhone);
-      console.log('🎟️ Ticket ID:', ticketId);
+      // Send ticket notification with QR code
+      const notificationResult = await processTicketPurchaseNotification(
+        order.id,
+        ticketId,
+        eventId,
+        event!.name,
+        event!.date,
+        event!.location,
+        attendeeName,
+        attendeeEmail,
+        attendeePhone,
+        selectedTicket.name,
+        selectedTicket.price
+      );
 
-      toast.success('Payment successful! Your ticket has been sent to your email and WhatsApp.');
+      if (notificationResult.success) {
+        toast.success('✅ Payment successful! Your ticket QR code has been sent to your email.');
+      } else {
+        // Ticket was created but notification may have failed
+        toast.success('✅ Ticket purchased! (Note: Email notification may have delayed)');
+      }
+
       onPurchaseComplete(order.id, ticketId);
     } catch (error) {
       console.error('Error purchasing ticket:', error);
@@ -312,7 +329,7 @@ export function TicketPurchase({ eventId, onPurchaseComplete }: TicketPurchasePr
             {loading ? 'Processing Payment...' : `Pay ₦${selectedTicket?.price.toLocaleString('en-NG')}`}
           </Button>
           <p className="text-xs text-center text-muted-foreground">
-            Your ticket will be delivered via email and WhatsApp instantly after payment
+            Your ticket QR code will be delivered via email instantly after payment
           </p>
         </CardFooter>
       </Card>

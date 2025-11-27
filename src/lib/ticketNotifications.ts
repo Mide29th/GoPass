@@ -46,7 +46,7 @@ export async function generateTicketQRCode(ticketCode: string): Promise<string> 
 }
 
 /**
- * Send ticket with QR code via email and WhatsApp
+ * Send ticket with QR code via email
  * Triggers Make.com automation for sending notifications
  */
 export async function sendTicketNotification(
@@ -57,10 +57,9 @@ export async function sendTicketNotification(
       throw new Error('Ticket webhook URL not configured. Please set WEBHOOK_TICKET_PURCHASE in webhooks-config.ts');
     }
 
-    console.log('📤 Sending ticket notification via Make.com...');
+    console.log('📧 Sending ticket via email...');
     console.log('Recipient:', {
       email: notificationData.attendee_email,
-      phone: notificationData.attendee_phone,
       name: notificationData.attendee_name,
     });
 
@@ -79,10 +78,10 @@ export async function sendTicketNotification(
     const responseText = await response.text();
 
     if (response.ok || response.status === 200) {
-      console.log('✅ Ticket notification sent successfully');
+      console.log('✅ Ticket email sent successfully');
       return {
         success: true,
-        message: 'Ticket sent to email and WhatsApp',
+        message: 'Ticket sent to email with QR code',
       };
     } else {
       console.error('❌ Notification webhook error:', response.status, responseText);
@@ -103,7 +102,7 @@ export async function sendTicketNotification(
 /**
  * Complete ticket purchase flow:
  * 1. Generate QR code
- * 2. Send notification via Make.com (email + WhatsApp)
+ * 2. Send notification via Make.com (email)
  * 3. Return ticket details
  */
 export async function processTicketPurchaseNotification(
@@ -130,7 +129,7 @@ export async function processTicketPurchaseNotification(
     const qrCodeDataUrl = await generateTicketQRCode(ticketCode);
 
     // Step 2: Send notification
-    console.log('🔄 Sending notifications...');
+    console.log('🔄 Sending email with QR code...');
     const notificationResult = await sendTicketNotification({
       ticket_id: ticketId,
       ticket_code: ticketCode,
@@ -151,13 +150,13 @@ export async function processTicketPurchaseNotification(
         success: true,
         ticketCode: ticketCode,
         qrCodeUrl: qrCodeDataUrl,
-        message: '✅ Ticket purchased! QR code sent to email and WhatsApp',
+        message: '✅ Ticket purchased! QR code sent to your email',
       };
     } else {
       return {
         success: false,
         ticketCode: ticketCode,
-        message: `Ticket created but notification failed: ${notificationResult.message}`,
+        message: `Ticket created but email failed: ${notificationResult.message}`,
       };
     }
   } catch (error) {

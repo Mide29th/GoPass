@@ -1,7 +1,7 @@
 # Ticket QR Code & Notification Setup Guide
 
 ## Overview
-This system automatically sends individual QR codes to ticket buyers via email and WhatsApp. Each QR code is unique and can be scanned at event entry.
+This system automatically sends individual QR codes to ticket buyers via email. Each QR code is unique and can be scanned at event entry.
 
 ## Components
 
@@ -9,98 +9,47 @@ This system automatically sends individual QR codes to ticket buyers via email a
 - Generates unique QR code for each ticket
 - Contains ticket code for entry validation
 - 300x300px PNG format
-- Can be embedded in email and WhatsApp messages
+- Embedded in email messages
 
 ### 2. **Email Notification** (via Make.com)
 - Recipient: Buyer's email from ticket purchase
 - Content: Event details + embedded QR code
 - Template customizable in Make.com
 
-### 3. **WhatsApp Notification** (via Make.com)
-- Recipient: Buyer's phone number from ticket purchase
-- Content: Event details + QR code image
-- Requires Make.com WhatsApp Business integration
-
 ## Setup Instructions
 
-### Step 1: Create Make.com Scenario for Ticket Notifications
+### Step 1: Make.com Scenario Configuration ✅
 
-1. Go to **Make.com Dashboard**
-2. Click **Create a new scenario**
-3. Name it: `GoPass - Ticket QR Code Notification`
+**Status:** Scenario created and active
+**Webhook URL:** `https://hook.us2.make.com/jrijtebvot2ei8arvgfi6uvxvcnd1zuh`
+**Configuration:** Email sending module active
 
-### Step 2: Configure Webhook Trigger
+The Make.com scenario is now set up to receive ticket purchase data and send emails with embedded QR codes.
 
-1. Add **Webhooks** → **Custom Webhook** as the first module
-2. Click **Add** to create webhook
-3. Copy the webhook URL
-4. **Important:** Update `src/lib/webhooks-config.ts`:
-   ```typescript
-   export const WEBHOOK_TICKET_PURCHASE = 'https://hook.us2.make.com/YOUR_NEW_URL_HERE';
-   ```
+### Step 2: Email Delivery Configuration
 
-### Step 3: Add Email Module
+The Make.com scenario is configured to:
+- **Receive:** Ticket purchase webhook data
+- **Extract:** Attendee email, event details, QR code
+- **Send:** Email with embedded QR code to `{{attendee_email}}`
+- **Trigger:** Automatic on each ticket purchase
 
-1. Add **Gmail** or **Email** module after webhook
-2. Configure email template with:
-   - Recipient: `{{attendee_email}}`
-   - Subject: `Your {{event_name}} Ticket - {{event_date}}`
-   - Body:
-     ```
-     Hi {{attendee_name}},
-     
-     Your ticket for {{event_name}} is attached as a QR code below.
-     
-     📅 Date: {{event_date}}
-     📍 Location: {{event_location}}
-     🎫 Ticket Type: {{ticket_type}}
-     💰 Price: {{price}}
-     
-     Please save or screenshot the QR code to show at event entry.
-     
-     Scan code: {{ticket_code}}
-     
-     Questions? Reply to this email.
-     
-     See you at the event! 🎉
-     ```
-3. Attach QR code from webhook data: `{{qr_code_data}}`
+### Step 3: Test the Flow
 
-### Step 4: Add WhatsApp Module (Optional)
+1. Make a test ticket purchase with:
+   - Email: Your test email address
+   - Event: Any available event
+2. Should receive email with QR code within seconds
 
-1. Add **WhatsApp Business** module
-2. Configure message template:
-   - Recipient: `{{attendee_phone}}`
-   - Message:
-     ```
-     Your {{event_name}} ticket is ready! 🎫
-     
-     📅 {{event_date}}
-     📍 {{event_location}}
-     
-     Scan your QR code at entry.
-     See you there! 🎉
-     ```
-3. Attach QR code image
+### Step 4: Ticket Purchase Integration ✅
 
-### Step 5: Test the Flow
-
-1. **Save** the scenario
-2. Make a test ticket purchase with:
-   - Email: Your test email
-   - Phone: Your test phone (WhatsApp)
-3. Should receive email + WhatsApp within seconds
-
-### Step 6: Integrate with Ticket Purchase
-
-The integration is automatic once webhook URL is configured.
+The integration is automatic and now active!
 
 When user purchases ticket:
 1. QR code generated
 2. Make.com scenario triggered
-3. Email sent with QR code
-4. WhatsApp sent with QR code
-5. Confirmation shown to user
+3. Email sent with QR code to attendee
+4. Confirmation shown to user
 
 ## Data Flow
 
@@ -111,13 +60,13 @@ Generate QR Code
     ↓
 POST to Make.com Webhook
     ↓
-├─ Send Email (with QR)
-├─ Send WhatsApp (with QR)
-└─ Log Event
+Make.com Scenario Triggered
     ↓
-Buyer Receives QR Code
+Send Email (with QR code)
     ↓
-Shows QR at Event Entry
+Buyer Receives Email
+    ↓
+Shows QR Code at Event Entry
     ↓
 Check-in Scanner Validates
 ```
@@ -148,12 +97,12 @@ When a ticket is purchased, Make.com receives:
 
 ✅ Unique QR code per ticket
 ✅ Automatic email delivery
-✅ Automatic WhatsApp delivery
 ✅ Customizable templates
 ✅ Event details included
 ✅ High error correction QR codes
 ✅ No daily limits
 ✅ Instant delivery
+✅ Make.com automation active
 
 ## Troubleshooting
 
@@ -164,13 +113,9 @@ When a ticket is purchased, Make.com receives:
 
 ### Email not received
 - Verify attendee email is correct
-- Check Make.com Gmail authentication
-- Test manually in Make.com
-
-### WhatsApp not sent
-- Verify phone number includes country code (e.g., +234...)
-- Make.com WhatsApp integration must be configured
-- Check Make.com rate limits
+- Check Make.com email provider authentication
+- Review Make.com webhook logs for received data
+- Check spam/junk folder
 
 ### QR code not displaying
 - Check Make.com email template supports base64 images
@@ -179,9 +124,9 @@ When a ticket is purchased, Make.com receives:
 
 ## Next Steps
 
-1. Install package: `npm install qrcode`
-2. Update `webhooks-config.ts` with Make.com webhook URL
-3. Set up Make.com scenario following steps above
+1. ✅ Make.com scenario configured
+2. ✅ Webhook URL: `https://hook.us2.make.com/jrijtebvot2ei8arvgfi6uvxvcnd1zuh`
+3. ✅ Code integrated in `TicketPurchase.tsx`
 4. Test with sample ticket purchase
 5. Deploy to production
 
@@ -194,6 +139,6 @@ When a ticket is purchased, Make.com receives:
 ## Security Notes
 
 - QR codes contain only ticket code (no sensitive data)
-- Phone numbers stored securely in database
-- Emails sent via Gmail/authenticated provider
-- Make.com handles all communication
+- Emails sent via authenticated email provider through Make.com
+- Make.com handles all communication securely
+- Webhook URL is unique and should not be shared publicly
