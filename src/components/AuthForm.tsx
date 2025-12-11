@@ -39,11 +39,26 @@ export function AuthForm({ onAuthSuccess, embedded = false }: AuthFormProps) {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Signup failed:', errorData);
+        
+        // Show specific error messages for email validation failures
+        if (errorData.validationFailed) {
+          if (errorData.reason === 'disposable_email') {
+            throw new Error('🚫 Disposable email addresses are not allowed. Please use your permanent email.');
+          } else if (errorData.reason === 'no_mx_record') {
+            throw new Error('❌ This email domain does not exist. Please check your email address.');
+          } else if (errorData.reason === 'smtp_invalid') {
+            throw new Error('❌ This email address does not exist. Please verify and try again.');
+          } else if (errorData.reason === 'undeliverable') {
+            throw new Error('❌ This email cannot receive messages. Please use a different email.');
+          }
+        }
+        
         throw new Error(errorData.error || 'Failed to create account');
       }
 
       const result = await response.json();
-      console.log('Signup successful:', result);
+      console.log('✅ Signup successful:', result);
 
       toast.success('Account created successfully!');
       setSignupData({ name: '', email: '', password: '' });

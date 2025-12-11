@@ -89,13 +89,121 @@ app.post("/make-server-0f8d8d4a/admin/login", async (c) => {
 
 // Auth endpoints
 app.post("/make-server-0f8d8d4a/auth/signup", async (c) => {
+  const requestId = crypto.randomUUID().substring(0, 8);
+  console.log(`🆕 [${requestId}] Signup request received`);
+  
   try {
     const { email, password, name } = await c.req.json();
+    console.log(`👤 [${requestId}] Signup attempt:`, { email, name });
     
     if (!email || !password || !name) {
+      console.error(`❌ [${requestId}] Missing fields:`, { hasEmail: !!email, hasPassword: !!password, hasName: !!name });
       return c.json({ error: 'Email, password, and name are required' }, 400);
     }
+
+    // Validate email format first (basic check)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.error(`❌ [${requestId}] Invalid email format:`, email);
+      return c.json({ error: 'Invalid email format' }, 400);
+    }
+
+    // SMTP Email Validation using Abstract API
+    const abstractApiKey = Deno.env.get('ABSTRACT_EMAIL_API_KEY');
     
+    if (abstractApiKey) {
+      console.log(`📧 [${requestId}] Starting SMTP validation for:`, email);
+      
+      try {
+        const validationStartTime = Date.now();
+        const validationResponse = await fetch(
+          `https://emailvalidation.abstractapi.com/v1/?api_key=${abstractApiKey}&email=${encodeURIComponent(email)}`,
+          { method: 'GET' }
+        );
+        const validationTime = Date.now() - validationStartTime;
+
+        console.log(`⏱️  [${requestId}] API response: ${validationTime}ms, Status: ${validationResponse.status}`);
+
+        if (validationResponse.ok) {
+          const validationData = await validationResponse.json();
+          
+          // Log detailed validation result
+          console.log(`📊 [${requestId}] Validation result:`, JSON.stringify({
+            email: validationData.email,
+            deliverability: validationData.deliverability,
+            quality_score: validationData.quality_score,
+            is_valid_format: validationData.is_valid_format?.value,
+            is_free_email: validationData.is_free_email?.value,
+            is_disposable_email: validationData.is_disposable_email?.value,
+            is_role_email: validationData.is_role_email?.value,
+            is_catchall_email: validationData.is_catchall_email?.value,
+            is_mx_found: validationData.is_mx_found?.value,
+            is_smtp_valid: validationData.is_smtp_valid?.value,
+          }, null, 2));
+
+          // Reject disposable email addresses
+          if (validationData.is_disposable_email?.value === true) {
+            console.error(`❌ [${requestId}] BLOCKED: Disposable email -`, email);
+            return c.json({ 
+              error: 'Disposable email addresses are not allowed. Please use a permanent email address.',
+              validationFailed: true,
+              reason: 'disposable_email'
+            }, 400);
+          }
+
+          // Check if email domain exists (MX record)
+          if (validationData.is_mx_found?.value === false) {
+            console.error(`❌ [${requestId}] BLOCKED: No MX record -`, email);
+            return c.json({ 
+              error: 'Email domain does not exist or has no mail server configured.',
+              validationFailed: true,
+              reason: 'no_mx_record'
+            }, 400);
+          }
+
+          // Check if email exists on the mail server (SMTP validation)
+          if (validationData.is_smtp_valid?.value === false) {
+            console.error(`❌ [${requestId}] BLOCKED: SMTP invalid - email does not exist -`, email);
+            return c.json({ 
+              error: 'This email address does not exist. Please check and try again.',
+              validationFailed: true,
+              reason: 'smtp_invalid'
+            }, 400);
+          }
+
+          // Check deliverability
+          if (validationData.deliverability === 'UNDELIVERABLE') {
+            console.error(`❌ [${requestId}] BLOCKED: Undeliverable -`, email);
+            return c.json({ 
+              error: 'This email address cannot receive emails. Please use a different email.',
+              validationFailed: true,
+              reason: 'undeliverable'
+            }, 400);
+          }
+
+          if (validationData.deliverability === 'RISKY') {
+            console.warn(`⚠️  [${requestId}] RISKY email allowed -`, email, `| Quality: ${validationData.quality_score}`);
+          }
+
+          console.log(`✅ [${requestId}] Email validation PASSED -`, email, `| ${validationData.deliverability} | Q:${validationData.quality_score}`);
+        } else {
+          const errorText = await validationResponse.text();
+          console.error(`⚠️  [${requestId}] API error - Status: ${validationResponse.status}:`, errorText);
+          console.log(`⚠️  [${requestId}] Proceeding with signup (fail-open)`);
+        }
+      } catch (validationError) {
+        console.error(`❌ [${requestId}] Validation exception:`, {
+          error: validationError.message,
+          stack: validationError.stack,
+          email: email
+        });
+        console.log(`⚠️  [${requestId}] Proceeding despite error (fail-open)`);
+      }
+    } else {
+      console.warn(`⚠️  [${requestId}] ABSTRACT_EMAIL_API_KEY not set, skipping SMTP validation`);
+    }
+    
+    console.log(`🔐 [${requestId}] Creating Supabase user:`, email);
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     const { data, error } = await supabase.auth.admin.createUser({
@@ -107,13 +215,19 @@ app.post("/make-server-0f8d8d4a/auth/signup", async (c) => {
     });
     
     if (error) {
-      console.error('Signup error:', error);
+      console.error(`❌ [${requestId}] Supabase creation failed:`, {
+        email,
+        error: error.message,
+        code: error.code,
+        status: error.status
+      });
       return c.json({ error: error.message }, 400);
     }
     
-    console.log('User created successfully:', data.user.id);
+    console.log(`✅ [${requestId}] User created:`, { userId: data.user.id, email: data.user.email });
     
     // Automatically sign in the user after creation
+    console.log(`🔑 [${requestId}] Auto-signin for:`, email);
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
     const { data: sessionData, error: signInError } = await supabaseClient.auth.signInWithPassword({
       email,
@@ -121,8 +235,11 @@ app.post("/make-server-0f8d8d4a/auth/signup", async (c) => {
     });
     
     if (signInError) {
-      console.error('Auto-signin error after signup:', signInError);
-      // User was created but signin failed - return user data without session
+      console.error(`❌ [${requestId}] Auto-signin failed:`, {
+        email,
+        error: signInError.message,
+        code: signInError.code
+      });
       return c.json({ 
         user: data.user,
         message: 'Account created successfully. Please sign in.',
@@ -130,7 +247,8 @@ app.post("/make-server-0f8d8d4a/auth/signup", async (c) => {
       });
     }
     
-    console.log('Auto-signin successful');
+    console.log(`✅ [${requestId}] Auto-signin successful:`, email);
+    console.log(`🎉 [${requestId}] SIGNUP COMPLETE - User: ${sessionData.user.id}`);
     
     return c.json({ 
       user: sessionData.user,
@@ -138,7 +256,11 @@ app.post("/make-server-0f8d8d4a/auth/signup", async (c) => {
       message: 'Account created and signed in successfully' 
     });
   } catch (error) {
-    console.error('Signup exception:', error);
+    console.error(`💥 [${requestId}] SIGNUP EXCEPTION:`, {
+      error: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     return c.json({ error: 'Failed to create account' }, 500);
   }
 });
@@ -183,22 +305,9 @@ app.post("/make-server-0f8d8d4a/verify-account", async (c) => {
       return c.json({ error: 'Account number and bank code are required' }, 400);
     }
 
-    // Validate account number format (should be 10+ digits for Nigerian banks)
-    if (!/^\d{10,}$/.test(account_number)) {
-      return c.json({ error: 'Account number must be at least 10 digits' }, 400);
-    }
-    
-    // Check if this is a test account (10 zeros) - bypass Paystack for testing
-    const isTestAccount = account_number === '0000000000';
-    if (isTestAccount) {
-      console.log('ℹ️ Test account detected (0000000000). Returning mock account verification.');
-      return c.json({
-        status: 'success',
-        verified: true,
-        account_name: `TEST ACCOUNT - ${bank_code}`,
-        account_number: account_number,
-        message: 'Account verified (TEST MODE)'
-      });
+    // Validate account number format (should be 10 digits for Nigerian banks)
+    if (!/^\d{10}$/.test(account_number)) {
+      return c.json({ error: 'Account number must be exactly 10 digits' }, 400);
     }
     
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -227,25 +336,13 @@ app.post("/make-server-0f8d8d4a/verify-account", async (c) => {
     if (!response.ok || !result.status) {
       console.error('Account verification failed:', result);
       return c.json({ 
-        status: 'error',
         error: result.message || 'Could not verify account number. Please check and try again.',
-        verified: false 
-      }, 400);
-    }
-
-    // Validate account name exists
-    if (!result.data || !result.data.account_name) {
-      console.error('Account name missing in Paystack response');
-      return c.json({ 
-        status: 'error',
-        error: 'Account verified but name not found. Please try again.',
         verified: false 
       }, 400);
     }
 
     // Return the verified account name
     return c.json({ 
-      status: 'success',
       verified: true,
       account_name: result.data.account_name,
       account_number: result.data.account_number,
@@ -254,7 +351,6 @@ app.post("/make-server-0f8d8d4a/verify-account", async (c) => {
   } catch (error) {
     console.error('Account verification exception:', error);
     return c.json({ 
-      status: 'error',
       error: 'Failed to verify account. Please try again.',
       verified: false 
     }, 500);
